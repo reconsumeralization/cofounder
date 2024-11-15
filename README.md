@@ -10,20 +10,42 @@
 - full stack generative web apps ; backend + db + stateful web apps
 - gen ui rooted in app architecture, with ai-guided mockup designer & modular design systems
 
+---
+
+# Early Alpha : Unstable ⚠️
+
+The following points are very emphasized :
+
+- This is an **EARLY, UNSTABLE, PREVIEW RELEASE** of the project. ⚠️ Until v1 is released, it is expected to break often. 
+- **It consumes a lot of tokens**. If you are on a tokens budget, wait until v1 is released.
+- Again, this is an early, unstable release. A first test run. An early preview of the project's ideas. Far from completion. Open-source iterative development. Work in progress. Unstable early alpha release. [etc]
+
+### **If any of these might be issues for you, even in the slightest way, wait until v1 is released ! Do not try the current release !**
+
+To help you guide your decision on whether or not to try the current release , here is a guide
+
+| Situation                                                                                             | Recommendation         |
+|------------------------------------------------------------------------------------------------------|------------------------|
+| I'm not sure if this tool release is mature yet, maybe it will not work as intended and I may spend millions of tokens for nothing | Do not use it yet      |
+| I am very excited about this tool, I hope it is perfectly production-ready, because if it's not, I will make commentary about `I spent X amount on OpenAI API calls` | Do not use it yet      |
+| I am not interested in code. I want to type words into a box and have my project completed; I do not want messy broken unfinished code | Do not use it yet      |
+| I love exploring experimental tools but I am on the fence. It's going to break halfway and leave me sad | Do not use it yet      |
+| Who should even try it at this point?                                                                | Nobody. Do not use it yet |
+| But I really want to use it for some esoteric reason having read all the above.                       | Do not use it yet either |
+
+
+---
 
 
 https://github.com/user-attachments/assets/cfd09250-d21e-49fc-a29b-fa0c661abfc0
 
 https://github.com/user-attachments/assets/c055f9c4-6bc0-4b11-ba8f-cc9f149387fa
 
-
-
-
 ---
 
 ## Important
 
-**Early alpha release ; earlier than expected by 5/6 weeks**
+**Early alpha release ; earlier than expected by few weeks**
 
 Still not merged with key target features of the project, notably :
 - project iteration modules for all dimensions of generated projects
@@ -55,7 +77,7 @@ Follow the instructions. The installer
 - will ask you for your keys
 - setup dirs & start installs
 - will start the local `cofounder/api` builder and server
-- will open the web dashboard where you can create new projects (at `http://localhost:667` ) 🎉
+- will open the web dashboard where you can create new projects (at `http://localhost:4200` ) 🎉
 
 ```
 note :
@@ -65,6 +87,10 @@ and can be used without limits during the current early alpha period
 
 the full index will be available for local download on v1 release
 ```
+
+- currently using `node v22` for the whole project. 
+
+
 
 ```sh
 # alternatively, you can make a new project without going through the dashboard
@@ -103,7 +129,7 @@ You can (re)start the `local cofounder API` running the following command from `
 npm run start
 ```
 
-The dashboard will open in `http://localhost:667`
+The dashboard will open in `http://localhost:4200`
 
 
 - note: You can also generate new apps from the same env, without the the dashboard, by running, from `./cofounder/api`, one of these commands
@@ -147,6 +173,24 @@ nodes:
 and change the `op:LLM::GEN` parameter `concurrency` to a higher value
 
 The default LLM concurrency is set to `2` so you can see what's happening in your console streams step by step - but you can increment it depending on your api keys limits
+
+---
+
+# Changelog
+
+---
+
+# Roadmap
+
+---
+
+# Benchmarks
+
+---
+
+# Community & Links
+
+- [![Cofounder](https://img.shields.io/badge/Cofounder-gray?style=for-the-badge&logo=discord&link=https://discord.gg/2kVMzeASj9)](https://discord.gg/2kVMzeASj9) | Community discord server by @flamecoders
 
 ---
 
