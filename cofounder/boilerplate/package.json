@@ -1,10 +1,10 @@
 {
-  "name": "boilerplate",
+  "name": "@cofounder/boilerplate-main",
   "version": "1.0.0",
-  "description": "",
+  "description": "Main package for running boilerplate frontend and backend together",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"cd vitereact && npm i && npm run dev\" \"cd backend && npm i && npm run start\""
+    "dev": "concurrently \"yarn workspace @cofounder/boilerplate-vitereact-boilerplate dev\" \"yarn workspace @cofounder/boilerplate-backend-boilerplate start\""
   },
   "author": "",
   "license": "ISC",

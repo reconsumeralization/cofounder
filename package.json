@@ -1,0 +1,22 @@
+{
+  "name": "cofounder-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "cofounder/api",
+    "cofounder/dashboard",
+    "cofounder/boilerplate",
+    "cofounder/boilerplate/backend-boilerplate",
+    "cofounder/boilerplate/vitereact-boilerplate"
+  ],
+  "scripts": {
+    "bootstrap": "yarn install",
+    "build": "yarn workspaces run build",
+    "lint": "yarn workspaces run lint",
+    "start:api": "yarn workspace @cofounder/api start",
+    "start:dashboard": "yarn workspace @cofounder/dashboard dev",
+    "start:boilerplate-main": "yarn workspace @cofounder/boilerplate-main dev",
+    "start:boilerplate-backend": "yarn workspace @cofounder/boilerplate-backend-boilerplate start",
+    "start:boilerplate-frontend": "yarn workspace @cofounder/boilerplate-vitereact-boilerplate dev"
+  }
+}
