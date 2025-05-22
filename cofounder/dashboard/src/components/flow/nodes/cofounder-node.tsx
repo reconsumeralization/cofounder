@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch"; // Import Switch
 import { toast } from "sonner";
 
 import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -76,6 +77,19 @@ export default memo(({ data, isConnectable }) => {
 	const [refresh, setRefresh] = useState(Date.now());
 	const [inputParams, setInputParams] = useState({});
 	const [isApiLoading, setIsApiLoading] = useState(false); // Local loading state for API call
+
+	// Initialize inputParams with defaultValues when data.meta.inputs changes
+	useEffect(() => {
+		if (data.meta?.inputs && Array.isArray(data.meta.inputs)) {
+			const initialParams = {};
+			for (const inputDef of data.meta.inputs) {
+				initialParams[inputDef.name] = inputDef.defaultValue !== undefined ? inputDef.defaultValue : '';
+			}
+			setInputParams(initialParams);
+		} else {
+			setInputParams({}); // Reset if no inputs defined
+		}
+	}, [data.meta]); // Dependency array: run when data.meta changes.
 
 	function getColor() {
 		return data?.meta?.type && color_map[data.meta.type]
@@ -565,48 +579,61 @@ export default memo(({ data, isConnectable }) => {
 
 					{getMinifiedContent()}
 
-					{/* Input Parameters Section */}
+					{/* Input Parameters Section - REVISED */}
 					<div className="p-2 space-y-3 my-2 border-t border-[#222] pt-3 text-xs">
 						<h4 className="text-xs font-semibold opacity-90 mb-2">Node Inputs:</h4>
-						{data.meta.type === "pm" && (
-							<div>
-								<Label htmlFor={`${data.key}-text_input`} className="text-xs opacity-70 block mb-1">General Text Input (PM Type):</Label>
-								<Textarea
-									id={`${data.key}-text_input`}
-									value={inputParams.text_input || ""}
-									onChange={(e) => setInputParams(prev => ({ ...prev, text_input: e.target.value }))}
-									placeholder="Enter general text input..."
-									className="bg-black/30 border-[#333] text-white text-xs"
-									rows={2}
-								/>
-							</div>
-						)}
-						{data.key === "pm.details" && ( 
-							<>
-								<div className="mt-2">
-									<Label htmlFor={`${data.key}-model_input`} className="text-xs opacity-70 block mb-1">Model (for pm.details):</Label>
-									<Input
-										id={`${data.key}-model_input`}
-										value={inputParams.model || "gpt-4o-mini"}
-										onChange={(e) => setInputParams(prev => ({ ...prev, model: e.target.value }))}
-										className="bg-black/30 border-[#333] text-white text-xs"
-									/>
+						{Array.isArray(data.meta.inputs) && data.meta.inputs.length > 0 ? (
+							data.meta.inputs.map((inputDef) => (
+								<div key={inputDef.name} className="mb-3">
+									<Label htmlFor={`${data.key}-${inputDef.name}`} className="mb-1 block text-xs opacity-70">
+										{inputDef.label}
+										{inputDef.required && <span className="text-red-500 ml-1">*</span>}
+									</Label>
+									{inputDef.type === 'text' && (
+										<Input
+											id={`${data.key}-${inputDef.name}`}
+											value={inputParams[inputDef.name] || ''}
+											onChange={(e) => setInputParams(prev => ({ ...prev, [inputDef.name]: e.target.value }))}
+											placeholder={inputDef.placeholder}
+											className="bg-black/30 border-[#333] text-white text-xs"
+										/>
+									)}
+									{(inputDef.type === 'textarea' || inputDef.type === 'json') && (
+										<Textarea
+											id={`${data.key}-${inputDef.name}`}
+											value={inputParams[inputDef.name] || ''}
+											onChange={(e) => setInputParams(prev => ({ ...prev, [inputDef.name]: e.target.value }))}
+											placeholder={inputDef.placeholder}
+											rows={inputDef.rows || 3}
+											className="bg-black/30 border-[#333] text-white text-xs"
+										/>
+									)}
+									{inputDef.type === 'number' && (
+										<Input
+											id={`${data.key}-${inputDef.name}`}
+											type="number" // Browser will provide UI for number input
+											value={inputParams[inputDef.name] || ''}
+											onChange={(e) => setInputParams(prev => ({ ...prev, [inputDef.name]: e.target.value }))} // Store as string in state
+											placeholder={inputDef.placeholder}
+											className="bg-black/30 border-[#333] text-white text-xs"
+										/>
+									)}
+									{inputDef.type === 'boolean' && (
+										<div className="flex items-center space-x-2 mt-1">
+											<Switch
+												id={`${data.key}-${inputDef.name}`}
+												checked={!!inputParams[inputDef.name]} // Coerce to boolean for checked prop
+												onCheckedChange={(checked) => setInputParams(prev => ({ ...prev, [inputDef.name]: checked }))}
+												className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-700"
+											/>
+											{/* Optional: Label can be placed here if desired next to the switch */}
+											{/* <Label htmlFor={`${data.key}-${inputDef.name}`} className="text-xs opacity-70">{inputDef.label}</Label> */}
+										</div>
+									)}
 								</div>
-								<div className="mt-2">
-									<Label htmlFor={`${data.key}-messages_input`} className="text-xs opacity-70 block mb-1">Messages (JSON string for pm.details):</Label>
-									<Textarea
-										id={`${data.key}-messages_input`}
-										value={inputParams.messages || "[{\"role\": \"user\", \"content\": \"Hello world\"}]"}
-										onChange={(e) => setInputParams(prev => ({ ...prev, messages: e.target.value }))}
-										placeholder="Enter messages as JSON string..."
-										className="bg-black/30 border-[#333] text-white text-xs"
-										rows={3}
-									/>
-								</div>
-							</>
-						)}
-						{(data.meta.type !== "pm" && data.key !== "pm.details") && (
-							<p className="text-xs opacity-60">No specific inputs defined for this node type/key.</p>
+							))
+						) : (
+							<p className="text-xs opacity-60">No specific inputs defined for this node type.</p>
 						)}
 					</div>
 					

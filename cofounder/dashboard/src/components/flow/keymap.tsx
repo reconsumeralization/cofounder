@@ -4,9 +4,63 @@ export default {
 			type: "pm",
 			name: "Details",
 			desc: "User-submitted Project Details",
+			"inputs": [
+				{
+					"name": "project_description",
+					"label": "Project Description",
+					"type": "textarea",
+					"defaultValue": "Please describe your project in detail.",
+					"placeholder": "Enter all relevant details about your project...",
+					"rows": 5,
+					"required": true
+				},
+				{
+					"name": "llm_model",
+					"label": "LLM Model (for generation assistance, if applicable)",
+					"type": "text",
+					"defaultValue": "gpt-4o-mini",
+					"placeholder": "e.g., gpt-4o-mini, gpt-4"
+				},
+				{
+					"name": "llm_messages",
+					"label": "LLM Messages (JSON string, for advanced use)",
+					"type": "json",
+					"defaultValue": "[{\"role\": \"user\", \"content\": \"Provide a summary of the project description.\"}]",
+					"rows": 3,
+					"placeholder": "Enter messages in JSON format"
+				},
+				{
+					"name": "max_tokens",
+					"label": "Max Tokens (for LLM)",
+					"type": "number",
+					"defaultValue": 256,
+					"placeholder": "e.g., 256"
+				},
+				{
+					"name": "use_streaming",
+					"label": "Use Streaming (for LLM)",
+					"type": "boolean",
+					"defaultValue": true
+				}
+			]
 		},
 
-		"pm.prd": { type: "pm", name: "PRD", desc: "Product Requirements Document" },
+		"pm.prd": {
+			type: "pm",
+			name: "PRD",
+			desc: "Product Requirements Document",
+			"inputs": [
+				{
+					"name": "prd_content",
+					"label": "Product Requirements",
+					"type": "textarea",
+					"defaultValue": "# Product Requirements Document\n\n## 1. Introduction\n\n## 2. Goals\n\n## 3. Target Audience\n\n## 4. Features\n",
+					"rows": 10,
+					"placeholder": "Define the product requirements...",
+					"required": true
+				}
+			]
+		},
 		"pm.frd": { type: "pm", name: "FRD", desc: "Features Requirements Document" },
 		"pm.drd": { type: "pm", name: "DRD", desc: "Database Requirements Document" },
 		"pm.brd": { type: "pm", name: "BRD", desc: "Backend Requirements Document" },
@@ -17,6 +71,17 @@ export default {
 			type: "db",
 			name: "DB/schemas",
 			desc: "Database Tables Schemas",
+			"inputs": [
+				{
+					"name": "schema_yaml",
+					"label": "Database Schemas (YAML format)",
+					"type": "textarea",
+					"defaultValue": "tables:\n  - name: users\n    columns:\n      - name: id\n        type: integer\n        primary_key: true\n      - name: username\n        type: varchar(255)\n        unique: true\n      - name: email\n        type: varchar(255)\n        unique: true\n      - name: created_at\n        type: timestamp\n        default: current_timestamp",
+					"rows": 10,
+					"placeholder": "Define your table schemas in YAML...",
+					"required": true
+				}
+			]
 		},
 		"db.postgres": {
 			type: "db",
