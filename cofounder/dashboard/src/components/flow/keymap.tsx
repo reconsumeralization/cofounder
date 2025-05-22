@@ -41,6 +41,18 @@ export default {
 					"label": "Use Streaming (for LLM)",
 					"type": "boolean",
 					"defaultValue": true
+				},
+				{
+					"name": "project_priority",
+					"label": "Project Priority",
+					"type": "select",
+					"defaultValue": "medium",
+					"options": [
+						{ "value": "low", "label": "Low" },
+						{ "value": "medium", "label": "Medium" },
+						{ "value": "high", "label": "High" }
+					],
+					"required": false
 				}
 			]
 		},

@@ -21,7 +21,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch"; // Import Switch
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; // Import Select components
 import { toast } from "sonner";
 
 import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -579,7 +586,7 @@ export default memo(({ data, isConnectable }) => {
 
 					{getMinifiedContent()}
 
-					{/* Input Parameters Section - REVISED */}
+					{/* Input Parameters Section */}
 					<div className="p-2 space-y-3 my-2 border-t border-[#222] pt-3 text-xs">
 						<h4 className="text-xs font-semibold opacity-90 mb-2">Node Inputs:</h4>
 						{Array.isArray(data.meta.inputs) && data.meta.inputs.length > 0 ? (
@@ -611,9 +618,9 @@ export default memo(({ data, isConnectable }) => {
 									{inputDef.type === 'number' && (
 										<Input
 											id={`${data.key}-${inputDef.name}`}
-											type="number" // Browser will provide UI for number input
+											type="number"
 											value={inputParams[inputDef.name] || ''}
-											onChange={(e) => setInputParams(prev => ({ ...prev, [inputDef.name]: e.target.value }))} // Store as string in state
+											onChange={(e) => setInputParams(prev => ({ ...prev, [inputDef.name]: e.target.value }))}
 											placeholder={inputDef.placeholder}
 											className="bg-black/30 border-[#333] text-white text-xs"
 										/>
@@ -622,13 +629,31 @@ export default memo(({ data, isConnectable }) => {
 										<div className="flex items-center space-x-2 mt-1">
 											<Switch
 												id={`${data.key}-${inputDef.name}`}
-												checked={!!inputParams[inputDef.name]} // Coerce to boolean for checked prop
+												checked={!!inputParams[inputDef.name]}
 												onCheckedChange={(checked) => setInputParams(prev => ({ ...prev, [inputDef.name]: checked }))}
 												className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-700"
 											/>
-											{/* Optional: Label can be placed here if desired next to the switch */}
-											{/* <Label htmlFor={`${data.key}-${inputDef.name}`} className="text-xs opacity-70">{inputDef.label}</Label> */}
 										</div>
+									)}
+									{inputDef.type === 'select' && (
+										<Select
+											value={inputParams[inputDef.name] || ''}
+											onValueChange={(selectedValue) =>
+												setInputParams(prev => ({ ...prev, [inputDef.name]: selectedValue }))
+											}
+										>
+											<SelectTrigger id={`${data.key}-${inputDef.name}`} className="bg-black/30 border-[#333] text-white text-xs">
+												<SelectValue placeholder={inputDef.placeholder || "Select an option"} />
+											</SelectTrigger>
+											<SelectContent className="bg-black/80 border-[#333] text-white">
+												{Array.isArray(inputDef.options) &&
+													inputDef.options.map((option) => (
+														<SelectItem key={option.value} value={option.value} className="hover:bg-white/20">
+															{option.label}
+														</SelectItem>
+													))}
+											</SelectContent>
+										</Select>
 									)}
 								</div>
 							))
