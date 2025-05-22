@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
 import yaml_syntax from "react-syntax-highlighter/dist/esm/languages/prism/yaml";
@@ -72,6 +74,8 @@ export default memo(({ data, isConnectable }) => {
 	const streamContainerRef = useRef<HTMLDivElement>(null);
 	const [metaHeaderClass, setMetaHeaderClass] = useState("");
 	const [refresh, setRefresh] = useState(Date.now());
+	const [inputParams, setInputParams] = useState({});
+	const [isApiLoading, setIsApiLoading] = useState(false); // Local loading state for API call
 
 	function getColor() {
 		return data?.meta?.type && color_map[data.meta.type]
@@ -98,12 +102,6 @@ export default memo(({ data, isConnectable }) => {
 			}
 		}
 	}, [node_data]);
-
-	/*
-	useEffect(() => {
-		setRefresh(Date.now())
-	}, [node_data , node_stream , node_extra]);
-	*/
 
 	function getMinifiedContent() {
 		// webapp component with versionning case
@@ -451,6 +449,58 @@ export default memo(({ data, isConnectable }) => {
 		}
 	}, [node_stream]);
 
+	const project_id = useSelector((state: any) => state.project.project);
+
+	const handleRunNode = async () => {
+		console.log(`Run button clicked for node: ${data.key}`);
+		setIsApiLoading(true); // Set loading true
+
+		if (!project_id) {
+			console.error("Project ID not found. Cannot run node.");
+			toast.error("Project ID not found. Cannot run node.");
+			setIsApiLoading(false); // Reset loading
+			return;
+		}
+		console.log(`Project ID: ${project_id}`);
+
+		const node_key = data.key;
+		const payload = {
+			project: project_id,
+			query: {
+				action: "execute:node",
+				data: {
+					node_key: node_key,
+					input_parameters: inputParams, 
+				},
+			},
+		};
+
+		console.log("Payload for execute:node:", payload);
+		toast.info(`Executing node: ${node_key}...`);
+
+		try {
+			const response = await fetch('/api/project/actions', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload),
+			});
+			const result = await response.json();
+
+			if (response.ok && result && result.end) { 
+				console.log('Node execution request successful:', result);
+				toast.success(`Node [${node_key}] execution request acknowledged.`);
+			} else {
+				console.error('Node execution request failed:', result);
+				toast.error(`Error executing node ${data.key}: ${result.error || response.statusText || 'Unknown server error'}`);
+			}
+		} catch (error) {
+			console.error('Error calling execute:node API:', error);
+			toast.error(`API call failed for node ${data.key}: ${error.message || 'Network error or invalid response'}`);
+		} finally {
+			setIsApiLoading(false); // Reset loading in finally block
+		}
+	};
+
 	return (
 		<>
 			<div className="hidden bg-[#FFA500] bg-[#000080] bg-[#FF10F0] bg-[#A020F0] bg-[#05D9FF] bg-[#39FF14]">
@@ -515,53 +565,108 @@ export default memo(({ data, isConnectable }) => {
 
 					{getMinifiedContent()}
 
-					{(node_data && (
-						<Dialog>
-							<div className="flex justify-end border-t pt-2 my-2 border-[#222]">
+					{/* Input Parameters Section */}
+					<div className="p-2 space-y-3 my-2 border-t border-[#222] pt-3 text-xs">
+						<h4 className="text-xs font-semibold opacity-90 mb-2">Node Inputs:</h4>
+						{data.meta.type === "pm" && (
+							<div>
+								<Label htmlFor={`${data.key}-text_input`} className="text-xs opacity-70 block mb-1">General Text Input (PM Type):</Label>
+								<Textarea
+									id={`${data.key}-text_input`}
+									value={inputParams.text_input || ""}
+									onChange={(e) => setInputParams(prev => ({ ...prev, text_input: e.target.value }))}
+									placeholder="Enter general text input..."
+									className="bg-black/30 border-[#333] text-white text-xs"
+									rows={2}
+								/>
+							</div>
+						)}
+						{data.key === "pm.details" && ( 
+							<>
+								<div className="mt-2">
+									<Label htmlFor={`${data.key}-model_input`} className="text-xs opacity-70 block mb-1">Model (for pm.details):</Label>
+									<Input
+										id={`${data.key}-model_input`}
+										value={inputParams.model || "gpt-4o-mini"}
+										onChange={(e) => setInputParams(prev => ({ ...prev, model: e.target.value }))}
+										className="bg-black/30 border-[#333] text-white text-xs"
+									/>
+								</div>
+								<div className="mt-2">
+									<Label htmlFor={`${data.key}-messages_input`} className="text-xs opacity-70 block mb-1">Messages (JSON string for pm.details):</Label>
+									<Textarea
+										id={`${data.key}-messages_input`}
+										value={inputParams.messages || "[{\"role\": \"user\", \"content\": \"Hello world\"}]"}
+										onChange={(e) => setInputParams(prev => ({ ...prev, messages: e.target.value }))}
+										placeholder="Enter messages as JSON string..."
+										className="bg-black/30 border-[#333] text-white text-xs"
+										rows={3}
+									/>
+								</div>
+							</>
+						)}
+						{(data.meta.type !== "pm" && data.key !== "pm.details") && (
+							<p className="text-xs opacity-60">No specific inputs defined for this node type/key.</p>
+						)}
+					</div>
+					
+					{/* Action Buttons and Dialog Section */}
+					<div className="flex justify-end gap-2 border-t pt-2 my-2 border-[#222]">
+						<Button 
+							variant="outline" 
+							onClick={handleRunNode}
+							disabled={isApiLoading || node_stream?.is_running}
+						>
+							{isApiLoading || node_stream?.is_running ? "Running..." : "Run"}
+						</Button>
+						{node_data ? (
+							<Dialog>
 								<DialogTrigger asChild>
 									<Button variant="outline">View</Button>
 								</DialogTrigger>
-							</div>
-							<DialogContent className="font-light bg-white/10 backdrop-blur-md border-[#222] max-w-[90vw] h-[90vh] max-h-[90vh] overflow-auto p-8">
-								<DialogHeader className="text-[#aaa]">
-									<DialogTitle>Detailed View</DialogTitle>
-									<DialogDescription className="text-white text-lg whitespace-pre-wrap break-words font-light">
-										{data.key}{" "}
-										<strong className="text-base">
-											{selectedVersion ? `{ ${selectedVersion} }` : ""}
-										</strong>
-									</DialogDescription>
-								</DialogHeader>
+								<DialogContent className="font-light bg-white/10 backdrop-blur-md border-[#222] max-w-[90vw] h-[90vh] max-h-[90vh] overflow-auto p-8">
+									<DialogHeader className="text-[#aaa]">
+										<DialogTitle>Detailed View</DialogTitle>
+										<DialogDescription className="text-white text-lg whitespace-pre-wrap break-words font-light">
+											{data.key}{" "}
+											<strong className="text-base">
+												{selectedVersion ? `{ ${selectedVersion} }` : ""}
+											</strong>
+										</DialogDescription>
+									</DialogHeader>
 
-								{(data.meta.content_type === "markdown" && data.key != "pm.details" && (
-									<>
-										<div className="rounded rounded-lg p-12 m-2 bg-[#2a2a2a] text-white text-sm overflow-auto whitespace-pre-wrap break-words">
-											<Markdown className="markdown" remarkPlugins={[remarkGfm]}>
-												{node_data}
-											</Markdown>
-										</div>
-									</>
-								)) ||
-									getExpandedContent()}
+									{(data.meta.content_type === "markdown" && data.key != "pm.details" && (
+										<>
+											<div className="rounded rounded-lg p-12 m-2 bg-[#2a2a2a] text-white text-sm overflow-auto whitespace-pre-wrap break-words">
+												<Markdown className="markdown" remarkPlugins={[remarkGfm]}>
+													{node_data}
+												</Markdown>
+											</div>
+										</>
+									)) ||
+										getExpandedContent()}
 
-								<pre
-									className=""
-									style={{ fontFamily: "JetBrains Mono", fontWeight: 400 }}
-								>
-									{/*<SyntaxHighlighter language="yaml" style={vscDarkPlus} wrapLines={true} wrapLongLines={true} >
-                  {yaml.stringify(node_data)}
-                </SyntaxHighlighter>
-                */}
-								</pre>
+									<pre
+										className=""
+										style={{ fontFamily: "JetBrains Mono", fontWeight: 400 }}
+									>
+										{/*<SyntaxHighlighter language="yaml" style={vscDarkPlus} wrapLines={true} wrapLongLines={true} >
+											{yaml.stringify(node_data)}
+										</SyntaxHighlighter>
+										*/}
+									</pre>
 
-								<DialogFooter>
-									<DialogClose asChild>
-										<Button variant="">Back</Button>
-									</DialogClose>
-								</DialogFooter>
-							</DialogContent>
-						</Dialog>
-					)) || <></>}
+									<DialogFooter>
+										<DialogClose asChild>
+											<Button variant="">Back</Button>
+										</DialogClose>
+									</DialogFooter>
+								</DialogContent>
+							</Dialog>
+						) : (
+							<Button variant="outline" disabled>View</Button>
+						)}
+					</div>
 
 					{/*
           <input

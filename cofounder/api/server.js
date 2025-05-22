@@ -647,6 +647,175 @@ const stream_to_client = async ({ project, key, meta }) => {
 };
 // ----------------------------------------------------------------------------------------------------
 
+// Helper function to safely access nested properties from an object
+function getValueFromPath(obj, path) {
+  if (path === "" || typeof path === "undefined" || path === null) return obj; // Return the object itself if path is empty or undefined
+  if (!obj) return null;
+
+  const parts = path.split('.');
+  let current = obj;
+  for (const part of parts) {
+    if (current && typeof current === 'object' && part in current) {
+      current = current[part];
+    } else {
+      console.warn(`getValueFromPath: Path [${path}] not found in object part [${part}]`, { object: obj } );
+      return null;
+    }
+  }
+  return current;
+}
+
+// Helper function for placeholder resolution
+function resolvePlaceholders(parameters, projectData, workflowInputs) {
+  console.log("resolvePlaceholders: Starting resolution with parameters:", JSON.stringify(parameters, null, 2));
+  console.log("resolvePlaceholders: projectData keys:", Object.keys(projectData || {}));
+  console.log("resolvePlaceholders: workflowInputs:", JSON.stringify(workflowInputs, null, 2));
+
+  const resolvedParameters = {};
+
+  for (const key in parameters) {
+    if (Object.hasOwnProperty.call(parameters, key)) {
+      const value = parameters[key];
+      let resolvedValue = value;
+
+      if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
+        const placeholder = value.substring(2, value.length - 2).trim(); // e.g., "workflow.input.X" or "data.node_id.path"
+        console.log(`resolvePlaceholders: Found placeholder for key [${key}]: ${placeholder}`);
+
+        if (placeholder.startsWith('workflow.input.')) {
+          const workflowInputKey = placeholder.substring('workflow.input.'.length);
+          if (workflowInputs && Object.hasOwnProperty.call(workflowInputs, workflowInputKey)) {
+            resolvedValue = workflowInputs[workflowInputKey];
+            console.log(`resolvePlaceholders: Resolved {{${placeholder}}} from workflowInputs to:`, resolvedValue);
+          } else {
+            resolvedValue = null;
+            console.warn(`resolvePlaceholders: Workflow input key [${workflowInputKey}] not found in workflowInputs. Setting to null.`);
+          }
+        } else if (placeholder.startsWith('data.')) {
+          const fullPath = placeholder.substring('data.'.length); // e.g., "node_id.path.to.value" or "node_id"
+          const pathParts = fullPath.split('.');
+          const nodeKey = pathParts.shift(); // First part is node_key
+          const actualPathInNodeOutput = pathParts.join('.'); // Rest is the path within that node's data
+
+          if (projectData && Object.hasOwnProperty.call(projectData, nodeKey)) {
+            const nodeData = projectData[nodeKey];
+            console.log(`resolvePlaceholders: Accessing projectData for nodeKey [${nodeKey}]. Path to resolve: [${actualPathInNodeOutput}]`);
+            resolvedValue = getValueFromPath(nodeData, actualPathInNodeOutput);
+            if (resolvedValue === null) {
+                console.warn(`resolvePlaceholders: Path [${actualPathInNodeOutput}] for nodeKey [${nodeKey}] resolved to null.`);
+            } else {
+                console.log(`resolvePlaceholders: Resolved {{${placeholder}}} from projectData[${nodeKey}] to:`, JSON.stringify(resolvedValue, null, 2));
+            }
+          } else {
+            resolvedValue = null;
+            console.warn(`resolvePlaceholders: Node key [${nodeKey}] not found in projectData. Setting to null.`);
+          }
+        } else {
+          console.warn(`resolvePlaceholders: Unrecognized placeholder format: {{${placeholder}}}. Keeping original.`);
+          // Keep original value if format is not recognized but matches {{...}}
+        }
+      }
+      resolvedParameters[key] = resolvedValue;
+    }
+  }
+  console.log("resolvePlaceholders: Finished resolution. Resolved parameters:", JSON.stringify(resolvedParameters, null, 2));
+  return resolvedParameters;
+}
+
+async function _executeNode({ request, data }) {
+  try {
+    const project_id = request.project;
+    // Assuming request.query.data contains { node_key: "...", input_parameters: { ... } }
+    const { node_key, input_parameters } = request.query.data;
+
+    console.log("Executing _executeNode with:");
+    console.dir({ project_id, node_key, input_parameters }, { depth: null });
+
+    // Placeholder Resolution
+    const resolved_parameters = resolvePlaceholders(input_parameters, data, {}); // Passing empty object for workflowInputs for now
+    console.log("Resolved parameters:");
+    console.dir({ resolved_parameters }, { depth: null });
+
+    // --- Determine System Function ID ---
+    if (!data || !data.keymap) {
+      console.error("_executeNode: Error - data.keymap is missing. Cannot determine node metadata or operationId.");
+      throw new Error("Project keymap is not loaded or missing, cannot execute node.");
+    }
+    // const keymap = data.keymap; // Not directly used for operationId in current strategy but good for future.
+
+    // Default operationId is the node_key itself.
+    let operationId = node_key;
+    console.log(`_executeNode: Default operationId set to node_key: [${operationId}]`);
+
+    // Check for operation_id_override in resolved_parameters
+    // Attempt to parse 'messages' if it's a string
+    if (resolved_parameters.messages && typeof resolved_parameters.messages === 'string') {
+      try {
+        resolved_parameters.messages = JSON.parse(resolved_parameters.messages);
+        console.log(`Successfully parsed 'messages' parameter for node ${node_key}.`);
+      } catch (e) {
+        console.warn(`Failed to parse 'messages' input string for node ${node_key}: ${e.message}. Passing as string.`);
+      }
+    }
+    
+    let final_params_for_system_run = { ...resolved_parameters };
+
+    if (resolved_parameters.use_operation_id_from_params === true) {
+      if (typeof resolved_parameters.operation_id_override === 'string' && resolved_parameters.operation_id_override.length > 0) {
+        operationId = resolved_parameters.operation_id_override;
+        console.log(`_executeNode: Overriding operationId with value from params: [${operationId}]`);
+      } else {
+        console.warn("_executeNode: use_operation_id_from_params was true, but operation_id_override was missing or invalid. Using default operationId.");
+      }
+    }
+    // Clean up override parameters so they are not passed to the system function
+    delete final_params_for_system_run.use_operation_id_from_params;
+    delete final_params_for_system_run.operation_id_override;
+    
+    if (!operationId) {
+        console.error("_executeNode: Error - operationId could not be determined.");
+        throw new Error("Could not determine the system function (operationId) to execute.");
+    }
+    console.log(`_executeNode: Final operationId: [${operationId}]`);
+
+    // --- Prepare Data for System Function ---
+    // resolved_parameters are used directly.
+    // We also merge the full project data 'data' and add node_key for context.
+    const system_run_data = { 
+      ...data, // Full project data
+      ...final_params_for_system_run, // Resolved input parameters for the node
+      node_key_being_executed: node_key // Explicitly pass which node is being executed
+    };
+
+    // --- Call System Function ---
+    console.log(`_executeNode: Calling cofounder.system.run with id: [${operationId}]`);
+    console.dir({ system_run_data_payload: system_run_data }, { depth: null });
+
+    const execution_result = await cofounder.system.run({
+      id: operationId,
+      context: { ...context, project: project_id }, // Global context + project_id
+      data: system_run_data,
+    });
+
+    console.log("_executeNode: cofounder.system.run execution result:");
+    console.dir({ execution_result }, { depth: null });
+
+    return {
+      success: true,
+      message: `Node [${node_key}] execution successful with operation [${operationId}].`,
+      operation_id: operationId,
+      result: execution_result, // This might be a summary or confirmation
+    };
+
+  } catch (error) {
+    console.error(`Error in _executeNode for node_key [${request.query?.data?.node_key || 'unknown'}]:`, error.message);
+    // The error will be caught by the main actions route handler's try...catch,
+    // which will then send a 500 response.
+    // We re-throw to ensure it's handled there.
+    throw error;
+  }
+}
+
 // -------------------------------------------------------- SERVER REST API FUNCTION CALLS ------------------------
 async function _updateProjectPreferences({ request }) {
 	/*
