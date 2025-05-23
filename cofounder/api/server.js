@@ -8,6 +8,8 @@ import dotenv from "dotenv";
 import yargs from "yargs";
 import fs from "fs";
 import yaml from "yaml";
+import { translateMermaidToReactFlow } from "./utils/translators.js"; // Added
+// Assuming parsers are part of the 'utils' import already, will use utils.parsers.parse.mermaid
 import { hideBin } from "yargs/helpers";
 import { merge } from "lodash-es";
 import open, { openApp, apps } from "open";
@@ -329,6 +331,108 @@ app.post("/api/project/actions", async (req, res) => {
 	} catch (error) {
 		console.error(error);
 		res.status(500).json({ error: "failed to process" });
+	}
+});
+
+app.post("/api/project/mermaid-to-reactflow", async (req, res) => {
+	const { mermaidString } = req.body;
+
+	if (!mermaidString) {
+		return res.status(400).json({ error: "mermaidString is required" });
+	}
+
+	try {
+		// utils.parsers.parse.mermaid is the function from cofounder/api/utils/parsers.js
+		const parsedMermaidData = await utils.parsers.parse.mermaid(mermaidString);
+
+		if (!parsedMermaidData) {
+			console.error("Failed to parse Mermaid string:", mermaidString);
+			return res.status(500).json({ error: "Failed to parse Mermaid diagram" });
+		}
+
+		const reactFlowData = translateMermaidToReactFlow(parsedMermaidData);
+
+		if (!reactFlowData) {
+			console.error("Failed to translate parsed Mermaid data to React Flow format");
+			return res.status(500).json({ error: "Failed to translate to React Flow format" });
+		}
+
+		res.status(200).json(reactFlowData);
+	} catch (error) {
+		console.error("Error in /api/project/mermaid-to-reactflow endpoint:", error);
+		res.status(500).json({ error: "Internal server error" });
+	}
+});
+
+app.post("/api/project/execute-node", async (req, res) => {
+	const { project, nodeKey, executionParams } = req.body;
+
+	if (!project || !nodeKey || !executionParams) {
+		return res.status(400).json({ error: "Missing required fields: project, nodeKey, or executionParams" });
+	}
+
+	const { serviceId, operation, inputParameters } = executionParams;
+
+	if (!serviceId || !operation) {
+		return res.status(400).json({ error: "executionParams must include serviceId and operation" });
+	}
+
+	// 1. Operation ID Mapping (simple convention)
+	// Example: serviceId 'db.postgres', operation 'GENERATE' -> 'DB:POSTGRES::GENERATE'
+	// Example: serviceId 'llm.openai', operation 'GEN' -> 'LLM:OPENAI::GEN'
+	const operationIdParts = serviceId.split('.');
+	let operationId = `${operationIdParts[0].toUpperCase()}`;
+	if (operationIdParts.length > 1) {
+		operationId += `:${operationIdParts.slice(1).join(':').toUpperCase()}`;
+	}
+	operationId += `::${operation.toUpperCase()}`;
+	
+	// A more direct mapping if cofounder.system.run expects a simpler ID like 'op:DB:POSTGRES::GENERATE'
+	// For now, assuming the above is how system functions are keyed, if not, this will need adjustment
+	// based on how functions are actually stored in `cofounder.system` (from build.js)
+
+	try {
+		// 2. Prepare `data` for the Operation
+		const operationData = inputParameters || {};
+
+		// 3. Prepare `context` for the Operation
+		// The global `context` object in server.js already has `streams`.
+		// We need to ensure it has the project and the run capability.
+		// `cofounder.system.run` itself is what we'll use.
+		const operationContext = {
+			...context, // This includes the global `streams`
+			project: project, // Add project to context
+			// `run` function is implicitly available via `cofounder.system.run`
+			// If individual functions need to call `context.run()`, that implies `cofounder.system`
+			// itself (or a subset) should be part of the context, or `cofounder.system.run` is wrapped.
+			// For now, we are calling cofounder.system.run directly with the constructed ID.
+		};
+		
+		console.log(`Executing operation: ${operationId} for project: ${project}`);
+		console.log(`With data:`, JSON.stringify(operationData, null, 2));
+		console.log(`With context project:`, operationContext.project);
+
+
+		// 4. Invoke the Operation
+		// `cofounder.system.run` is the main entry point for running operations.
+		// It internally resolves the `id` to the actual function.
+		const result = await cofounder.system.run({
+			id: operationId, // The constructed operation ID
+			context: operationContext,
+			data: operationData,
+		});
+
+		// 5. Response
+		res.status(200).json({ success: true, message: "Node executed successfully", result: result || null });
+
+	} catch (error) {
+		console.error(`Error executing node ${nodeKey} (operation ${operationId}):`, error);
+		// Check if the error is because the operation ID was not found
+		// This depends on how cofounder.system.run signals this (e.g., specific error message or type)
+		if (error.message && error.message.toLowerCase().includes("not found") || error.message.toLowerCase().includes("could not find service")) { // Heuristic
+			return res.status(404).json({ error: `Operation ID '${operationId}' not found or service not available.` });
+		}
+		res.status(500).json({ error: "Failed to execute node", details: error.message });
 	}
 });
 // ----------------------------------------------------------------------------------------------------
